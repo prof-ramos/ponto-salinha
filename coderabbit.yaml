@@ -1,0 +1,144 @@
+# CodeRabbit Configuration
+# Criado especialmente para o projeto ponto-salinha
+language: pt-BR
+tone_instructions: "Você deve falar como o Sr. T. Tenho pena do tolo que não fala assim!"
+early_access: true
+enable_free_tier: true
+
+reviews:
+  profile: assertive  # Feedback mais detalhado e rigoroso
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+  auto_title_placeholder: "@coderabbitai"
+  auto_title_instructions: "Nome irônico, humor extremamente pesado"
+  review_status: true
+  commit_status: true
+  fail_commit_status: true
+  collapse_walkthrough: true
+  changed_files_summary: true
+  sequence_diagrams: true
+  estimate_code_review_effort: true
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+  suggested_labels: true
+  auto_apply_labels: true
+  suggested_reviewers: true
+  auto_assign_reviewers: true
+  poem: true
+  enable_prompt_for_ai_agents: true
+  abort_on_close: false
+
+  # Instruções específicas por caminho
+  path_instructions:
+    - path: "**/*.py"
+      instructions: |
+        - Verificar tipagem estática com type hints
+        - Garantir tratamento adequado de exceções
+        - Validar uso correto das APIs do discord.py
+        - Verificar gerenciamento de recursos (conexões DB, etc.)
+        - Assegurar que operações assíncronas usem await corretamente
+    
+    - path: "**/database.py"
+      instructions: |
+        - Verificar SQL injection e segurança de queries
+        - Validar uso correto de índices
+        - Garantir que conexões sejam fechadas adequadamente
+        - Verificar tratamento de erros de banco de dados
+    
+    - path: "**/benchmark*.py"
+      instructions: |
+        - Validar metodologia de medição de performance
+        - Verificar se resultados são reproduzíveis
+        - Assegurar que benchmarks testam cenários realistas
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    base_branches: []
+
+  finishing_touches:
+    docstrings:
+      enabled: true
+    unit_tests:
+      enabled: true
+
+  pre_merge_checks:
+    docstrings:
+      mode: warning
+      threshold: 80
+    title:
+      mode: warning
+    description:
+      mode: warning
+    issue_assessment:
+      mode: warning
+
+  # Ferramentas habilitadas
+  tools:
+    # Python linters
+    ruff:
+      enabled: true
+    pylint:
+      enabled: true
+    flake8:
+      enabled: true
+    
+    # Segurança
+    gitleaks:
+      enabled: true
+    bandit:
+      enabled: true
+    
+    # Outros
+    shellcheck:
+      enabled: true
+    markdownlint:
+      enabled: true
+    yamllint:
+      enabled: true
+    github-checks:
+      enabled: true
+      timeout_ms: 90000
+    languagetool:
+      enabled: true
+      level: default
+
+chat:
+  art: true
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  web_search:
+    enabled: true
+  code_guidelines:
+    enabled: true
+  learnings:
+    scope: auto
+  issues:
+    scope: auto
+  pull_requests:
+    scope: auto
+
+code_generation:
+  docstrings:
+    language: pt-BR
+    path_instructions:
+      - path: "**/*.py"
+        instructions: |
+          - Usar docstrings no formato Google Style
+          - Incluir tipos nos parâmetros e retorno
+          - Documentar exceções levantadas
+          - Incluir exemplos quando apropriado
+  
+  unit_tests:
+    path_instructions:
+      - path: "**/*.py"
+        instructions: |
+          - Usar pytest como framework
+          - Incluir casos de sucesso e falha
+          - Mockar conexões externas (Discord API, banco de dados)
+          - Testar edge cases e validações
