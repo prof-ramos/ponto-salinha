@@ -1,0 +1,22 @@
+services:
+  bot:
+    build: .
+    restart: always
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATABASE_PATH=/app/data/ponto.db
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+        reservations:
+          cpus: '0.10'
+          memory: 64M
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
