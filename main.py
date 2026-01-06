@@ -17,7 +17,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     print(f'Bot conectado como {bot.user}')
     # Initialize DB on startup to ensure tables exist
-    Database() 
+    Database().init_db()
     try:
         synced = await bot.tree.sync()
         print(f'Comandos sincronizados! ({len(synced)} comandos)')
