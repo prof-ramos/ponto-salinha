@@ -2,7 +2,8 @@ import discord
 import logging
 from discord import app_commands
 from discord.ext import commands
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 logger = logging.getLogger("PontoBot.Ponto")
 
@@ -11,16 +12,26 @@ class PontoCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db = bot.db
+        self.TZ = ZoneInfo("America/Sao_Paulo")
 
     @app_commands.command(
         name="ponto", description="Registrar sua entrada ou saída do trabalho"
     )
     async def ponto(self, interaction: discord.Interaction):
+        # Validation: DM check
+        if interaction.guild_id is None:
+            await interaction.response.send_message(
+                "❌ Este comando não pode ser usado em mensagens diretas.",
+                ephemeral=True,
+            )
+            return
+
         await interaction.response.defer(ephemeral=True)
 
         user_id = interaction.user.id
         guild_id = interaction.guild_id
-        now = datetime.now(timezone.utc)
+        # Use Brazil time for consistency
+        now = datetime.now(self.TZ)
         timestamp_atual = now.isoformat()
 
         try:
@@ -36,7 +47,14 @@ class PontoCog(commands.Cog):
 
         if not status_data or status_data["status"] == "inativo":
             # ENTRADA
-            await self.db.register_entry(user_id, guild_id, timestamp_atual)
+            try:
+                await self.db.register_entry(user_id, guild_id, timestamp_atual)
+            except Exception as e:
+                logger.error(f"Erro ao registrar entrada do usuário {user_id}: {e}")
+                await interaction.followup.send(
+                    "❌ Erro ao salvar registro de entrada.", ephemeral=True
+                )
+                return
 
             embed.title = "🟢 Ponto de Entrada"
             embed.description = f"Olá {interaction.user.mention}, seu ponto de entrada foi registrado com sucesso!"
@@ -54,9 +72,9 @@ class PontoCog(commands.Cog):
                 timestamp_entrada = datetime.fromisoformat(
                     status_data["timestamp_entrada"]
                 )
-                # Garantir que timestamp_entrada seja timezone-aware para cálculo
+                # Ensure incoming timestamp is aware or assumes TZ
                 if timestamp_entrada.tzinfo is None:
-                    timestamp_entrada = timestamp_entrada.replace(tzinfo=timezone.utc)
+                    timestamp_entrada = timestamp_entrada.replace(tzinfo=self.TZ)
             except (ValueError, TypeError, KeyError) as e:
                 logger.error(
                     f"Erro ao processar timestamp de entrada para o usuário {user_id}: {e}"
@@ -67,7 +85,8 @@ class PontoCog(commands.Cog):
                 )
                 return
 
-            duracao_segundos = int((now - timestamp_entrada).total_seconds())
+            # Clamp duration to 0 to avoid negative values
+            duracao_segundos = max(0, int((now - timestamp_entrada).total_seconds()))
 
             try:
                 await self.db.register_exit(
@@ -100,12 +119,15 @@ class PontoCog(commands.Cog):
 
         await interaction.followup.send(embed=embed)
 
-        # Enviar log
+        # Audit Log
         try:
             config = await self.db.get_config(guild_id)
             if config and config["log_channel_id"]:
                 channel = interaction.guild.get_channel(config["log_channel_id"])
-                if channel:
+                # Validate channel type
+                if channel and isinstance(
+                    channel, (discord.TextChannel, discord.Thread)
+                ):
                     log_embed = discord.Embed(
                         description=f"{emoji} {interaction.user.mention} registrou **{tipo_msg}**",
                         color=embed.color,

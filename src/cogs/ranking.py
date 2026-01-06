@@ -2,7 +2,8 @@ import discord
 import logging
 from discord import app_commands
 from discord.ext import commands
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 logger = logging.getLogger("PontoBot.Ranking")
 
@@ -11,6 +12,13 @@ class RankingCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db = bot.db
+        self.TZ = ZoneInfo("America/Sao_Paulo")
+        self.PERIOD_MAP = {
+            "hoje": "Hoje",
+            "semana": "Esta Semana",
+            "mes": "Este Mês",
+            "total": "Total",
+        }
 
     def _format_tempo(self, total_segundos: int) -> tuple[int, int]:
         """Converte segundos totais em horas e minutos."""
@@ -33,7 +41,9 @@ class RankingCog(commands.Cog):
     async def ranking(self, interaction: discord.Interaction, periodo: str = "semana"):
         await interaction.response.defer()
 
-        now = datetime.now(timezone.utc)
+        # Use Sao Paulo timezone
+        now = datetime.now(self.TZ)
+
         if periodo == "hoje":
             data_inicio = now.replace(
                 hour=0, minute=0, second=0, microsecond=0
@@ -43,7 +53,7 @@ class RankingCog(commands.Cog):
         elif periodo == "mes":
             data_inicio = (now - timedelta(days=30)).isoformat()
         else:
-            data_inicio = "2000-01-01T00:00:00Z"
+            data_inicio = "2000-01-01T00:00:00Z"  # Safe fallback for total
 
         try:
             resultados = await self.db.get_ranking(interaction.guild_id, data_inicio)
@@ -60,8 +70,10 @@ class RankingCog(commands.Cog):
             )
             return
 
+        periodo_display = self.PERIOD_MAP.get(periodo, periodo.capitalize())
+
         embed = discord.Embed(
-            title=f"🏆 Ranking de Produtividade - {periodo.capitalize()}",
+            title=f"🏆 Ranking de Produtividade - {periodo_display}",
             description="Os membros mais ativos do servidor.",
             color=discord.Color.gold(),
             timestamp=now,

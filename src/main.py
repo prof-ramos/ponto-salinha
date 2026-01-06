@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import os
 import asyncio
+import sys
 from dotenv import load_dotenv
 import logging
 from database import Database
@@ -20,7 +21,8 @@ class PontoBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.members = True
-        super().__init__(command_prefix="!", intents=intents)
+        # Setting command_prefix to empty list as we primarily use Slash Commands
+        super().__init__(command_prefix=[], intents=intents)
 
         try:
             self.db = Database()
@@ -64,7 +66,12 @@ async def main():
         if not token:
             logger.error("DISCORD_TOKEN não encontrado no arquivo .env")
             return
-        await bot.start(token)
+
+        try:
+            await bot.start(token)
+        except Exception as e:
+            logger.critical(f"Falha ao iniciar conexão com Discord: {e}", exc_info=True)
+            raise
 
 
 if __name__ == "__main__":
@@ -72,3 +79,6 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("Bot desligado manualmente (KeyboardInterrupt).")
+    except Exception as e:
+        logger.critical(f"Erro não tratado na execução principal: {e}", exc_info=True)
+        sys.exit(1)

@@ -6,7 +6,8 @@ import asyncio
 import tempfile
 from discord import app_commands
 from discord.ext import commands
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from openpyxl.styles import Font, Alignment
 
 logger = logging.getLogger("PontoBot.Report")
@@ -16,6 +17,7 @@ class ReportCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db = bot.db
+        self.TZ = ZoneInfo("America/Sao_Paulo")
 
     @app_commands.command(
         name="relatorio", description="Gerar relatório de horas em Excel"
@@ -62,13 +64,15 @@ class ReportCog(commands.Cog):
             return
 
         # Gerar Excel em uma thread separada
-        loop = asyncio.get_event_loop()
         try:
+            loop = asyncio.get_running_loop()
             filename = await loop.run_in_executor(
                 None, self._generate_excel, target, registros
             )
         except Exception as e:
-            logger.error(f"Erro ao gerar arquivo Excel para {target.id}: {e}")
+            logger.error(
+                f"Erro ao gerar arquivo Excel para {target.id}: {e}", exc_info=True
+            )
             await interaction.followup.send(
                 "❌ Erro ao gerar o relatório.", ephemeral=True
             )
@@ -78,7 +82,7 @@ class ReportCog(commands.Cog):
             title="📊 Relatório Gerado",
             description=f"O histórico de pontos de **{target.display_name}** foi processado.",
             color=discord.Color.purple(),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(self.TZ),
         )
         embed.set_thumbnail(url=target.display_avatar.url)
         embed.add_field(
@@ -118,21 +122,28 @@ class ReportCog(commands.Cog):
         # Dados
         for idx, row in enumerate(registros, 2):
             try:
-                dt = datetime.fromisoformat(row["timestamp"])
-                # Garantir UTC para formatação no Excel
+                # Safe keys
+                ts_val = row.get("timestamp") or str(datetime.now(self.TZ).isoformat())
+                dt = datetime.fromisoformat(ts_val)
+                # Garantir TZ awareness
                 if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
+                    dt = dt.replace(tzinfo=self.TZ)
+
+                # Format using local time
                 ws.cell(row=idx, column=1, value=dt.strftime("%d/%m/%Y %H:%M:%S"))
             except (ValueError, TypeError) as e:
-                logger.warning(f"Timestamp inválido no registro {row.get('id')}: {e}")
+                logger.warning(
+                    f"Timestamp inválido no registro {row.get('id', '?')}: {e}"
+                )
                 ws.cell(row=idx, column=1, value=str(row.get("timestamp", "-")))
 
-            ws.cell(row=idx, column=2, value=row["tipo"].capitalize())
+            tipo = str(row.get("tipo", "")).capitalize()
+            ws.cell(row=idx, column=2, value=tipo)
 
-            duracao = row["duracao_segundos"]
-            if row["tipo"] == "saida" and duracao:
-                horas = duracao // 3600
-                minutos = (duracao % 3600) // 60
+            duracao = row.get("duracao_segundos")
+            if tipo.lower() == "saida" and isinstance(duracao, (int, float)):
+                horas = int(duracao) // 3600
+                minutos = (int(duracao) % 3600) // 60
                 ws.cell(row=idx, column=3, value=f"{horas}h {minutos}min")
             else:
                 ws.cell(row=idx, column=3, value="-")
@@ -147,7 +158,7 @@ class ReportCog(commands.Cog):
                         val = str(cell.value) if cell.value is not None else ""
                         if len(val) > max_length:
                             max_length = len(val)
-                    except Exception:
+                    except (ValueError, TypeError, AttributeError):
                         pass
                 adjusted_width = max_length + 2
                 ws.column_dimensions[column].width = adjusted_width
@@ -155,8 +166,7 @@ class ReportCog(commands.Cog):
             logger.warning(f"Erro ao ajustar larguras de coluna: {e}")
 
         # Gerar nome de arquivo seguro usando tempfile
-        # Usamos abas para evitar problemas de path traversal com target.name
-        suffix = f"_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.xlsx"
+        suffix = f"_{datetime.now(self.TZ).strftime('%Y%m%d_%H%M%S')}.xlsx"
         # Criar arquivo temporário seguro
         fd, path = tempfile.mkstemp(suffix=suffix, prefix="relatorio_")
         os.close(fd)  # Fechar o file descriptor pois wb.save abrirá o arquivo

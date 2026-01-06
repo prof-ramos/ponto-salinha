@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+ponto.db
+ponto.db.bak
+*.log
+.env
+
+# Debug artifacts
+analisecoderabbit_debug.md
+debug.md
+analisecoderabbit.md
