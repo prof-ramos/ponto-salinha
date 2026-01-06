@@ -1,2 +1,4 @@
 discord.py>=2.0.0
 openpyxl>=3.0.0
+pytz==2025.2
+textual==7.0.0
