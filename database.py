@@ -5,7 +5,7 @@ import os
 class Database:
     def __init__(self, db_path='ponto.db'):
         self.db_path = db_path
-        self.init_db()
+        # init_db is now called explicitly in main.py to avoid overhead on every instantiation
     
     def get_connection(self):
         return sqlite3.connect(self.db_path)
@@ -46,6 +46,19 @@ class Database:
                 timestamp_entrada TEXT,
                 PRIMARY KEY (user_id, guild_id)
             )
+        ''')
+
+        # Índices para otimização de performance
+        # Melhora performance do comando ranking (filtro por guild, tipo e data)
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_registros_ranking
+            ON registros (guild_id, tipo, timestamp)
+        ''')
+
+        # Melhora performance do comando relatorio (filtro por user, guild e ordenação por data)
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_registros_user
+            ON registros (user_id, guild_id, timestamp)
         ''')
         
         conn.commit()
