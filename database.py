@@ -8,7 +8,10 @@ class Database:
         # init_db is now called explicitly in main.py to avoid overhead on every instantiation
     
     def get_connection(self):
-        return sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path)
+        # Enable WAL mode for better concurrency
+        conn.execute('PRAGMA journal_mode=WAL;')
+        return conn
     
     def init_db(self):
         conn = self.get_connection()
@@ -21,10 +24,18 @@ class Database:
                 log_channel_id INTEGER,
                 mensagem_entrada TEXT,
                 mensagem_saida TEXT,
-                cargo_autorizado_id INTEGER
+                cargo_autorizado_id INTEGER,
+                timezone TEXT DEFAULT 'America/Sao_Paulo'
             )
         ''')
         
+        # Check if timezone column exists (migration for existing DBs)
+        try:
+            cursor.execute("SELECT timezone FROM config LIMIT 1")
+        except sqlite3.OperationalError:
+            # Column doesn't exist, add it
+            cursor.execute("ALTER TABLE config ADD COLUMN timezone TEXT DEFAULT 'America/Sao_Paulo'")
+
         # Tabela de registros de ponto
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS registros (
