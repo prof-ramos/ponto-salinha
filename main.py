@@ -7,7 +7,7 @@ import os
 import openpyxl
 from openpyxl.styles import Font, Alignment
 import pytz
-from functools import lru_cache
+import threading
 
 intents = discord.Intents.default()
 intents.members = True
@@ -15,19 +15,46 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# Thread-safe timezone cache
+_timezone_cache = {}
+_timezone_cache_lock = threading.Lock()
+
 # Helpers for Timezone
-@lru_cache(maxsize=1024)
-def get_guild_timezone(guild_id: int):
-    """Retrieve timezone string from DB or default to Sao_Paulo"""
+def get_guild_timezone(guild_id: int) -> pytz.BaseTzInfo:
+    """Retrieve timezone string from DB or default to Sao_Paulo (with per-guild caching)"""
+    # Check cache first
+    with _timezone_cache_lock:
+        if guild_id in _timezone_cache:
+            return _timezone_cache[guild_id]
+
+    # Cache miss - fetch from database
     db = Database()
     conn = db.get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT timezone FROM config WHERE guild_id = ?', (guild_id,))
     res = cursor.fetchone()
     conn.close()
+
     if res and res[0]:
-        return pytz.timezone(res[0])
-    return pytz.timezone('America/Sao_Paulo')
+        try:
+            tz = pytz.timezone(res[0])
+        except pytz.UnknownTimeZoneError:
+            # Invalid timezone in database - fallback to default
+            print(f"Warning: Invalid timezone '{res[0]}' for guild {guild_id}, using default")
+            tz = pytz.timezone('America/Sao_Paulo')
+    else:
+        tz = pytz.timezone('America/Sao_Paulo')
+
+    # Store in cache (double-checked locking to prevent race conditions)
+    with _timezone_cache_lock:
+        if guild_id not in _timezone_cache:
+            _timezone_cache[guild_id] = tz
+        return _timezone_cache[guild_id]
+
+def clear_guild_timezone_cache(guild_id: int) -> None:
+    """Clear timezone cache for a specific guild"""
+    with _timezone_cache_lock:
+        _timezone_cache.pop(guild_id, None)
 
 def get_now(guild_id: int):
     """Get current time aware of guild timezone"""
@@ -117,13 +144,14 @@ async def config(
         INSERT OR REPLACE INTO config (guild_id, log_channel_id, cargo_autorizado_id, timezone)
         VALUES (?, ?, ?, ?)
     ''', (interaction.guild_id, new_log_id, new_role_id, new_timezone))
-    
+
     conn.commit()
     conn.close()
 
-    # Clear cache for this guild (since we can't easily clear just one entry in lru_cache, we clear all)
-    get_guild_timezone.cache_clear()
-    
+    # Clear cache for this specific guild if timezone was updated
+    if fuso_horario:
+        clear_guild_timezone_cache(interaction.guild_id)
+
     msg_parts = []
     if canal_log: msg_parts.append(f"Logs: {canal_log.mention}")
     if cargo: msg_parts.append(f"Cargo: {cargo.mention}")
