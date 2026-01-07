@@ -7,6 +7,7 @@ import os
 import openpyxl
 from openpyxl.styles import Font, Alignment
 import pytz
+from functools import lru_cache
 
 intents = discord.Intents.default()
 intents.members = True
@@ -15,6 +16,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Helpers for Timezone
+@lru_cache(maxsize=1024)
 def get_guild_timezone(guild_id: int):
     """Retrieve timezone string from DB or default to Sao_Paulo"""
     db = Database()
@@ -118,6 +120,9 @@ async def config(
     
     conn.commit()
     conn.close()
+
+    # Clear cache for this guild (since we can't easily clear just one entry in lru_cache, we clear all)
+    get_guild_timezone.cache_clear()
     
     msg_parts = []
     if canal_log: msg_parts.append(f"Logs: {canal_log.mention}")
