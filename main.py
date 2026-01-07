@@ -7,6 +7,7 @@ import os
 import openpyxl
 from openpyxl.styles import Font, Alignment
 import pytz
+import threading
 
 intents = discord.Intents.default()
 intents.members = True
@@ -14,18 +15,41 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# Thread-safe timezone cache
+_timezone_cache = {}
+_timezone_cache_lock = threading.Lock()
+
 # Helpers for Timezone
 def get_guild_timezone(guild_id: int):
-    """Retrieve timezone string from DB or default to Sao_Paulo"""
+    """Retrieve timezone string from DB or default to Sao_Paulo (with per-guild caching)"""
+    # Check cache first
+    with _timezone_cache_lock:
+        if guild_id in _timezone_cache:
+            return _timezone_cache[guild_id]
+
+    # Cache miss - fetch from database
     db = Database()
     conn = db.get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT timezone FROM config WHERE guild_id = ?', (guild_id,))
     res = cursor.fetchone()
     conn.close()
+
     if res and res[0]:
-        return pytz.timezone(res[0])
-    return pytz.timezone('America/Sao_Paulo')
+        tz = pytz.timezone(res[0])
+    else:
+        tz = pytz.timezone('America/Sao_Paulo')
+
+    # Store in cache
+    with _timezone_cache_lock:
+        _timezone_cache[guild_id] = tz
+
+    return tz
+
+def clear_guild_timezone_cache(guild_id: int):
+    """Clear timezone cache for a specific guild"""
+    with _timezone_cache_lock:
+        _timezone_cache.pop(guild_id, None)
 
 def get_now(guild_id: int):
     """Get current time aware of guild timezone"""
@@ -115,10 +139,14 @@ async def config(
         INSERT OR REPLACE INTO config (guild_id, log_channel_id, cargo_autorizado_id, timezone)
         VALUES (?, ?, ?, ?)
     ''', (interaction.guild_id, new_log_id, new_role_id, new_timezone))
-    
+
     conn.commit()
     conn.close()
-    
+
+    # Clear cache for this specific guild if timezone was updated
+    if fuso_horario:
+        clear_guild_timezone_cache(interaction.guild_id)
+
     msg_parts = []
     if canal_log: msg_parts.append(f"Logs: {canal_log.mention}")
     if cargo: msg_parts.append(f"Cargo: {cargo.mention}")
