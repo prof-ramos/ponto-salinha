@@ -20,7 +20,7 @@ _timezone_cache = {}
 _timezone_cache_lock = threading.Lock()
 
 # Helpers for Timezone
-def get_guild_timezone(guild_id: int):
+def get_guild_timezone(guild_id: int) -> pytz.BaseTzInfo:
     """Retrieve timezone string from DB or default to Sao_Paulo (with per-guild caching)"""
     # Check cache first
     with _timezone_cache_lock:
@@ -36,17 +36,22 @@ def get_guild_timezone(guild_id: int):
     conn.close()
 
     if res and res[0]:
-        tz = pytz.timezone(res[0])
+        try:
+            tz = pytz.timezone(res[0])
+        except pytz.UnknownTimeZoneError:
+            # Invalid timezone in database - fallback to default
+            print(f"Warning: Invalid timezone '{res[0]}' for guild {guild_id}, using default")
+            tz = pytz.timezone('America/Sao_Paulo')
     else:
         tz = pytz.timezone('America/Sao_Paulo')
 
-    # Store in cache
+    # Store in cache (double-checked locking to prevent race conditions)
     with _timezone_cache_lock:
-        _timezone_cache[guild_id] = tz
+        if guild_id not in _timezone_cache:
+            _timezone_cache[guild_id] = tz
+        return _timezone_cache[guild_id]
 
-    return tz
-
-def clear_guild_timezone_cache(guild_id: int):
+def clear_guild_timezone_cache(guild_id: int) -> None:
     """Clear timezone cache for a specific guild"""
     with _timezone_cache_lock:
         _timezone_cache.pop(guild_id, None)
