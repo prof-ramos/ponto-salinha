@@ -4,10 +4,12 @@ import openpyxl
 import os
 import asyncio
 import tempfile
+from typing import List, Any
+from pathlib import Path
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
-from zoneinfo import ZoneInfo
+from src.config import TIMEZONE
 from openpyxl.styles import Font, Alignment
 
 logger = logging.getLogger("PontoBot.Report")
@@ -17,7 +19,6 @@ class ReportCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db = bot.db
-        self.TZ = ZoneInfo("America/Sao_Paulo")
 
     @app_commands.command(
         name="relatorio", description="Gerar relatório de horas em Excel"
@@ -63,43 +64,58 @@ class ReportCog(commands.Cog):
             )
             return
 
-        # Gerar Excel em uma thread separada
+        filename: str = ""
         try:
-            loop = asyncio.get_running_loop()
-            filename = await loop.run_in_executor(
-                None, self._generate_excel, target, registros
+            # Gerar Excel em uma thread separada
+            try:
+                loop = asyncio.get_running_loop()
+                filename = await loop.run_in_executor(
+                    None, self._generate_excel, target, registros
+                )
+            except Exception:
+                logger.exception(f"Erro ao gerar arquivo Excel para {target.id}")
+                await interaction.followup.send(
+                    "❌ Erro ao gerar o relatório.", ephemeral=True
+                )
+                return
+
+            embed = discord.Embed(
+                title="📊 Relatório Gerado",
+                description=f"O histórico de pontos de **{target.display_name}** foi processado.",
+                color=discord.Color.purple(),
+                timestamp=datetime.now(TIMEZONE),
             )
-        except Exception as e:
-            logger.error(
-                f"Erro ao gerar arquivo Excel para {target.id}: {e}", exc_info=True
+            embed.set_thumbnail(url=target.display_avatar.url)
+            embed.add_field(
+                name="Total de Registros", value=str(len(registros)), inline=True
             )
-            await interaction.followup.send(
-                "❌ Erro ao gerar o relatório.", ephemeral=True
-            )
-            return
 
-        embed = discord.Embed(
-            title="📊 Relatório Gerado",
-            description=f"O histórico de pontos de **{target.display_name}** foi processado.",
-            color=discord.Color.purple(),
-            timestamp=datetime.now(self.TZ),
-        )
-        embed.set_thumbnail(url=target.display_avatar.url)
-        embed.add_field(
-            name="Total de Registros", value=str(len(registros)), inline=True
-        )
+            # Verificação defensiva do arquivo
+            if not filename or not os.path.exists(filename):
+                logger.error(f"Arquivo de relatório não encontrado: {filename}")
+                await interaction.followup.send(
+                    "❌ Erro interno: O arquivo de relatório não foi criado.", ephemeral=True
+                )
+                return
 
-        await interaction.followup.send(
-            embed=embed, file=discord.File(filename), ephemeral=True
-        )
+            try:
+                await interaction.followup.send(
+                    embed=embed, file=discord.File(filename), ephemeral=True
+                )
+            except Exception:
+                logger.exception("Erro ao enviar arquivo de relatório")
+                await interaction.followup.send(
+                    "❌ Erro ao enviar o arquivo de relatório.", ephemeral=True
+                )
+        finally:
+            # Limpeza garantida
+            if filename and os.path.exists(filename):
+                try:
+                    os.remove(filename)
+                except Exception as e:
+                    logger.error(f"Erro ao deletar arquivo temporário {filename}: {e}")
 
-        # Limpeza
-        try:
-            os.remove(filename)
-        except Exception as e:
-            logger.error(f"Erro ao deletar arquivo temporário {filename}: {e}")
-
-    def _generate_excel(self, target, registros):
+    def _generate_excel(self, target: discord.Member, registros: List[Any]) -> str:
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Relatório de Ponto"
@@ -123,11 +139,11 @@ class ReportCog(commands.Cog):
         for idx, row in enumerate(registros, 2):
             try:
                 # Safe keys
-                ts_val = row.get("timestamp") or str(datetime.now(self.TZ).isoformat())
+                ts_val = row.get("timestamp") or str(datetime.now(TIMEZONE).isoformat())
                 dt = datetime.fromisoformat(ts_val)
                 # Garantir TZ awareness
                 if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=self.TZ)
+                    dt = dt.replace(tzinfo=TIMEZONE)
 
                 # Format using local time
                 ws.cell(row=idx, column=1, value=dt.strftime("%d/%m/%Y %H:%M:%S"))
@@ -166,7 +182,7 @@ class ReportCog(commands.Cog):
             logger.warning(f"Erro ao ajustar larguras de coluna: {e}")
 
         # Gerar nome de arquivo seguro usando tempfile
-        suffix = f"_{datetime.now(self.TZ).strftime('%Y%m%d_%H%M%S')}.xlsx"
+        suffix = f"_{datetime.now(TIMEZONE).strftime('%Y%m%d_%H%M%S')}.xlsx"
         # Criar arquivo temporário seguro
         fd, path = tempfile.mkstemp(suffix=suffix, prefix="relatorio_")
         os.close(fd)  # Fechar o file descriptor pois wb.save abrirá o arquivo
