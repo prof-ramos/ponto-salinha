@@ -63,41 +63,58 @@ class ReportCog(commands.Cog):
             )
             return
 
-        # Gerar Excel em uma thread separada
+        filename = None
         try:
-            loop = asyncio.get_running_loop()
-            filename = await loop.run_in_executor(
-                None, self._generate_excel, target, registros
-            )
-        except Exception as e:
-            logger.error(
-                f"Erro ao gerar arquivo Excel para {target.id}: {e}", exc_info=True
-            )
-            await interaction.followup.send(
-                "❌ Erro ao gerar o relatório.", ephemeral=True
-            )
-            return
+            # Gerar Excel em uma thread separada
+            try:
+                loop = asyncio.get_running_loop()
+                filename = await loop.run_in_executor(
+                    None, self._generate_excel, target, registros
+                )
+            except Exception as e:
+                logger.error(
+                    f"Erro ao gerar arquivo Excel para {target.id}: {e}", exc_info=True
+                )
+                await interaction.followup.send(
+                    "❌ Erro ao gerar o relatório.", ephemeral=True
+                )
+                return
 
-        embed = discord.Embed(
-            title="📊 Relatório Gerado",
-            description=f"O histórico de pontos de **{target.display_name}** foi processado.",
-            color=discord.Color.purple(),
-            timestamp=datetime.now(self.TZ),
-        )
-        embed.set_thumbnail(url=target.display_avatar.url)
-        embed.add_field(
-            name="Total de Registros", value=str(len(registros)), inline=True
-        )
+            embed = discord.Embed(
+                title="📊 Relatório Gerado",
+                description=f"O histórico de pontos de **{target.display_name}** foi processado.",
+                color=discord.Color.purple(),
+                timestamp=datetime.now(self.TZ),
+            )
+            embed.set_thumbnail(url=target.display_avatar.url)
+            embed.add_field(
+                name="Total de Registros", value=str(len(registros)), inline=True
+            )
 
-        await interaction.followup.send(
-            embed=embed, file=discord.File(filename), ephemeral=True
-        )
+            # Verificação defensiva do arquivo
+            if not filename or not os.path.exists(filename):
+                logger.error(f"Arquivo de relatório não encontrado: {filename}")
+                await interaction.followup.send(
+                    "❌ Erro interno: O arquivo de relatório não foi criado.", ephemeral=True
+                )
+                return
 
-        # Limpeza
-        try:
-            os.remove(filename)
-        except Exception as e:
-            logger.error(f"Erro ao deletar arquivo temporário {filename}: {e}")
+            try:
+                await interaction.followup.send(
+                    embed=embed, file=discord.File(filename), ephemeral=True
+                )
+            except Exception as e:
+                logger.error(f"Erro ao enviar arquivo de relatório: {e}", exc_info=True)
+                await interaction.followup.send(
+                    "❌ Erro ao enviar o arquivo de relatório.", ephemeral=True
+                )
+        finally:
+            # Limpeza garantida
+            if filename and os.path.exists(filename):
+                try:
+                    os.remove(filename)
+                except Exception as e:
+                    logger.error(f"Erro ao deletar arquivo temporário {filename}: {e}")
 
     def _generate_excel(self, target, registros):
         wb = openpyxl.Workbook()

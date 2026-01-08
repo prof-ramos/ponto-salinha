@@ -152,6 +152,28 @@ class AdminCog(commands.Cog):
 
         await interaction.followup.send(embed=embed, ephemeral=True)
 
+    @limpar_dados.error
+    @config.error
+    async def admin_error_handler(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        """Tratador de erros para comandos que exigem permissão de administrador."""
+        if isinstance(error, app_commands.MissingPermissions):
+            embed = discord.Embed(
+                title="🚫 Acesso Negado",
+                description="Você não tem permissão para usar este comando.\nExigido: **Administrador**",
+                color=discord.Color.red()
+            )
+            if interaction.response.is_done():
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            else:
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+        else:
+            logger.error(f"Erro inesperado no comando admin: {error}", exc_info=True)
+            msg = "❌ Ocorreu um erro ao processar o comando."
+            if interaction.response.is_done():
+                await interaction.followup.send(msg, ephemeral=True)
+            else:
+                await interaction.response.send_message(msg, ephemeral=True)
+
 
 async def setup(bot):
     await bot.add_cog(AdminCog(bot))

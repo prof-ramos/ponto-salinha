@@ -289,7 +289,7 @@ class Database:
             logger.error(f"Error fetching records for user {user_id}", exc_info=True)
             raise DatabaseError("Failed to get user records") from e
 
-    async def clear_data(self, guild_id: int, data_limite: str = None):
+    async def clear_data(self, guild_id: int, data_limite: Optional[str] = None) -> int:
         """Limpa registros antigos."""
         try:
             async with aiosqlite.connect(self.db_path) as db:
@@ -298,7 +298,6 @@ class Database:
                         "DELETE FROM registros WHERE guild_id = ? AND timestamp < ?",
                         (guild_id, data_limite),
                     )
-                    # Também remove status antigos para manter a integridade
                     await db.execute(
                         "DELETE FROM status_ponto WHERE guild_id = ? AND timestamp_entrada < ?",
                         (guild_id, data_limite),
