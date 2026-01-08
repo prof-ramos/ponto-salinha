@@ -71,10 +71,8 @@ class ReportCog(commands.Cog):
                 filename = await loop.run_in_executor(
                     None, self._generate_excel, target, registros
                 )
-            except Exception as e:
-                logger.error(
-                    f"Erro ao gerar arquivo Excel para {target.id}: {e}", exc_info=True
-                )
+            except Exception:
+                logger.exception(f"Erro ao gerar arquivo Excel para {target.id}")
                 await interaction.followup.send(
                     "❌ Erro ao gerar o relatório.", ephemeral=True
                 )
@@ -103,8 +101,8 @@ class ReportCog(commands.Cog):
                 await interaction.followup.send(
                     embed=embed, file=discord.File(filename), ephemeral=True
                 )
-            except Exception as e:
-                logger.error(f"Erro ao enviar arquivo de relatório: {e}", exc_info=True)
+            except Exception:
+                logger.exception("Erro ao enviar arquivo de relatório")
                 await interaction.followup.send(
                     "❌ Erro ao enviar o arquivo de relatório.", ephemeral=True
                 )

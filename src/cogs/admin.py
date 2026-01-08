@@ -167,7 +167,7 @@ class AdminCog(commands.Cog):
             else:
                 await interaction.response.send_message(embed=embed, ephemeral=True)
         else:
-            logger.error(f"Erro inesperado no comando admin: {error}", exc_info=True)
+            logger.exception(f"Erro inesperado no comando admin: {error}")
             msg = "❌ Ocorreu um erro ao processar o comando."
             if interaction.response.is_done():
                 await interaction.followup.send(msg, ephemeral=True)

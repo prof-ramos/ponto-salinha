@@ -8,9 +8,9 @@
 
 > Um bot de registro de ponto eletrônico robusto, assíncrono e fácil de implantar para comunidades do Discord e equipes remotas.
 
-## 📋 Descrição
+## Descrição
 
-O **Ponto Salinha** permite que os usuários registrem entrada e saída diretamente no Discord, acompanhando suas horas de trabalho com precisão. Projetado para equipes que precisam de um gerenciamento de tempo simples e eficaz sem depender de plataformas externas complexas, este bot garante latência zero e controle total dos dados através de um banco de dados SQLite local.
+O **Ponto Salinha** permite que os usuários registrem entrada e saída diretamente no Discord, acompanhando suas horas de trabalho com precisão. Projetado para equipes que precisam de um gerenciamento de tempo simples e eficaz sem depender de plataformas externas complexas, este bot garante latência zero e controle total dos dados por um banco de dados SQLite local.
 
 ### Principais Funcionalidades
 - **Rastreamento em Tempo Real**: Feedback instantâneo para ações de entrada e saída com cálculo de duração.
@@ -19,16 +19,16 @@ O **Ponto Salinha** permite que os usuários registrem entrada e saída diretame
 - **Arquitetura Assíncrona**: Construído com `aiosqlite` para garantir operações não bloqueantes, mesmo sob carga.
 - **Docker Ready**: Configuração Docker pronta para uso com verificações de integridade (healthchecks) e persistência.
 
-## 📑 Índice
-- [Instalação](#-instalação)
-- [Configuração](#-configuração)
-- [Início Rápido / Uso](#-início-rápido--uso)
-- [Comandos](#-comandos)
-- [Desenvolvimento](#-desenvolvimento)
-- [Contribuição](#-contribuição)
-- [Licença](#-licença)
+## Índice
+- [Instalação](#instalação)
+- [Configuração](#configuração)
+- [Início Rápido](#início-rápido--uso)
+- [Comandos](#comandos)
+- [Desenvolvimento](#desenvolvimento)
+- [Contribuição](#contribuição)
+- [Licença](#licença)
 
-## 🚀 Instalação
+## Instalação
 
 ### Pré-requisitos
 - Python 3.11 ou superior
@@ -45,7 +45,7 @@ O **Ponto Salinha** permite que os usuários registrem entrada e saída diretame
 
 2. **Configure as variáveis de ambiente:**
    ```bash
-   # Certifique-se de que o .env.example existe na raiz do projeto
+   # Certifique-se de que o arquivo .env.example existe na raiz do projeto
    cp .env.example .env
    # Abra o .env e adicione seu DISCORD_TOKEN
    ```
@@ -79,7 +79,7 @@ O **Ponto Salinha** permite que os usuários registrem entrada e saída diretame
    python src/main.py
    ```
 
-## ⚙️ Configuração
+## Configuração
 
 A aplicação é configurada via arquivo `.env` na raiz do projeto.
 
@@ -96,7 +96,7 @@ DATABASE_PATH=data/ponto.db
 LOG_LEVEL=INFO
 ```
 
-## 🎮 Início Rápido / Uso
+## Início Rápido / Uso
 
 Assim que o bot estiver online, ele exibirá o status "Jogando /ponto". Você pode interagir com ele usando Comandos de Barra (Slash Commands) em qualquer canal que o bot tenha acesso.
 
@@ -108,7 +108,7 @@ Digite `/ponto` para iniciar seu turno.
 Digite `/ponto` novamente para encerrar seu turno.
 > **Bot:** "🔴 Ponto de Saída registrado às 17:00:00. Duração: 8h 00min"
 
-## ⌨️ Comandos
+## Comandos
 
 | Comando | Argumentos | Permissões | Descrição |
 |:--------|:----------|:------------|:------------|
@@ -118,7 +118,7 @@ Digite `/ponto` novamente para encerrar seu turno.
 | `/config` | `canal_log` (Obrigatório), `[cargo]` (Opcional) | Admin | Define o canal de logs e o cargo autorizado opcional. |
 | `/limpar_dados` | `periodo` | Admin | **⚠️ PERIGO**: Remove permanentemente registros do banco. Requer confirmação explícita. |
 
-## 💻 Desenvolvimento
+## Desenvolvimento
 
 ### Configuração do Ambiente de Dev
 
@@ -129,7 +129,7 @@ Digite `/ponto` novamente para encerrar seu turno.
 ### Executando Testes
 *Atualmente, o projeto não possui uma suíte de testes dedicada. Contribuições adicionando testes unitários para `database.py` e Cogs são bem-vindas.*
 
-## 🤝 Contribuição
+## Contribuição
 
 Contribuições são o que tornam a comunidade de código aberto um lugar incrível para aprender, inspirar e criar. Qualquer contribuição que você fizer será **muito apreciada**.
 
@@ -139,11 +139,11 @@ Contribuições são o que tornam a comunidade de código aberto um lugar incrí
 4. Faça o Push para a Branch (`git push origin feature/MinhaFuncionalidade`)
 5. Abra um Pull Request
 
-## 📄 Licença
+## Licença
 
 Distribuído sob a Licença MIT. Veja `LICENSE` para mais informações.
 
-## 👥 Autores & Agradecimentos
+## Autores & Agradecimentos
 
 - **Gabriel Ramos** - *Trabalho Inicial*
 
@@ -151,10 +151,10 @@ Distribuído sob a Licença MIT. Veja `LICENSE` para mais informações.
 
 ---
 
-## 📞 Suporte
+## Suporte
 
 Se você encontrar algum problema ou tiver dúvidas, siga estas diretrizes:
 
-- **🐛 Bugs**: Abra uma [Issue](https://github.com/seu-usuario/ponto-salinha/issues) usando o template de Bug. Inclua passos para reproduzir, comportamento esperado e logs se possível.
-- **✨ Funcionalidades**: Para sugerir novas ideias, use o template de Feature Request descrevendo o caso de uso.
-- **💬 Dúvidas**: Para perguntas gerais ou ajuda com configuração, sinta-se à vontade para perguntar em nosso servidor do Discord ou nas Discussões do GitHub.
+- **Bugs**: Abra uma [Issue](https://github.com/seu-usuario/ponto-salinha/issues) usando o modelo de Bug. Inclua passos para reproduzir, comportamento esperado e logs, se possível.
+- **Funcionalidades**: Para sugerir novas ideias, use o modelo de Feature Request descrevendo o caso de uso.
+- **Dúvidas**: Para perguntas gerais ou ajuda com configuração, sinta-se à vontade para perguntar em nosso servidor do Discord ou nas Discussões do GitHub.
