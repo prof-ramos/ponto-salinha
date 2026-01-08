@@ -3,6 +3,7 @@ import os
 import logging
 from typing import Optional, Any
 from aiosqlite import Error as SQLiteError
+from src.config import DATABASE_PATH, TIMEZONE_STR
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ class DatabaseError(Exception):
 
 class Database:
     def __init__(self, db_path: str = None):
-        self.db_path = db_path or os.getenv("DATABASE_PATH", "ponto.db")
+        self.db_path = db_path or DATABASE_PATH
         self._validate_db_path()
 
     def _validate_db_path(self):
@@ -48,14 +49,14 @@ class Database:
                 await db.execute('PRAGMA journal_mode=WAL;')
 
                 # Configurações por servidor
-                await db.execute("""
+                await db.execute(f"""
                     CREATE TABLE IF NOT EXISTS config (
                         guild_id INTEGER PRIMARY KEY,
                         log_channel_id INTEGER,
                         mensagem_entrada TEXT,
                         mensagem_saida TEXT,
                         cargo_autorizado_id INTEGER,
-                        timezone TEXT DEFAULT 'America/Sao_Paulo'
+                        timezone TEXT DEFAULT '{TIMEZONE_STR}'
                     )
                 """)
 
@@ -63,7 +64,7 @@ class Database:
                 try:
                     await db.execute("SELECT timezone FROM config LIMIT 1")
                 except Exception:
-                    await db.execute("ALTER TABLE config ADD COLUMN timezone TEXT DEFAULT 'America/Sao_Paulo'")
+                    await db.execute(f"ALTER TABLE config ADD COLUMN timezone TEXT DEFAULT '{TIMEZONE_STR}'")
 
                 # Tabela de registros
                 await db.execute("""

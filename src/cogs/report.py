@@ -4,10 +4,12 @@ import openpyxl
 import os
 import asyncio
 import tempfile
+from typing import List, Any
+from pathlib import Path
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
-from zoneinfo import ZoneInfo
+from src.config import TIMEZONE
 from openpyxl.styles import Font, Alignment
 
 logger = logging.getLogger("PontoBot.Report")
@@ -17,7 +19,6 @@ class ReportCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db = bot.db
-        self.TZ = ZoneInfo("America/Sao_Paulo")
 
     @app_commands.command(
         name="relatorio", description="Gerar relatório de horas em Excel"
@@ -63,7 +64,7 @@ class ReportCog(commands.Cog):
             )
             return
 
-        filename = None
+        filename: str = ""
         try:
             # Gerar Excel em uma thread separada
             try:
@@ -82,7 +83,7 @@ class ReportCog(commands.Cog):
                 title="📊 Relatório Gerado",
                 description=f"O histórico de pontos de **{target.display_name}** foi processado.",
                 color=discord.Color.purple(),
-                timestamp=datetime.now(self.TZ),
+                timestamp=datetime.now(TIMEZONE),
             )
             embed.set_thumbnail(url=target.display_avatar.url)
             embed.add_field(
@@ -114,7 +115,7 @@ class ReportCog(commands.Cog):
                 except Exception as e:
                     logger.error(f"Erro ao deletar arquivo temporário {filename}: {e}")
 
-    def _generate_excel(self, target, registros):
+    def _generate_excel(self, target: discord.Member, registros: List[Any]) -> str:
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Relatório de Ponto"
@@ -138,11 +139,11 @@ class ReportCog(commands.Cog):
         for idx, row in enumerate(registros, 2):
             try:
                 # Safe keys
-                ts_val = row.get("timestamp") or str(datetime.now(self.TZ).isoformat())
+                ts_val = row.get("timestamp") or str(datetime.now(TIMEZONE).isoformat())
                 dt = datetime.fromisoformat(ts_val)
                 # Garantir TZ awareness
                 if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=self.TZ)
+                    dt = dt.replace(tzinfo=TIMEZONE)
 
                 # Format using local time
                 ws.cell(row=idx, column=1, value=dt.strftime("%d/%m/%Y %H:%M:%S"))
@@ -181,7 +182,7 @@ class ReportCog(commands.Cog):
             logger.warning(f"Erro ao ajustar larguras de coluna: {e}")
 
         # Gerar nome de arquivo seguro usando tempfile
-        suffix = f"_{datetime.now(self.TZ).strftime('%Y%m%d_%H%M%S')}.xlsx"
+        suffix = f"_{datetime.now(TIMEZONE).strftime('%Y%m%d_%H%M%S')}.xlsx"
         # Criar arquivo temporário seguro
         fd, path = tempfile.mkstemp(suffix=suffix, prefix="relatorio_")
         os.close(fd)  # Fechar o file descriptor pois wb.save abrirá o arquivo

@@ -3,7 +3,7 @@ import logging
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+from src.config import TIMEZONE
 
 logger = logging.getLogger("PontoBot.Ranking")
 
@@ -12,7 +12,6 @@ class RankingCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db = bot.db
-        self.TZ = ZoneInfo("America/Sao_Paulo")
         self.PERIOD_MAP = {
             "hoje": "Hoje",
             "semana": "Esta Semana",
@@ -42,7 +41,7 @@ class RankingCog(commands.Cog):
         await interaction.response.defer()
 
         # Use Sao Paulo timezone
-        now = datetime.now(self.TZ)
+        now = datetime.now(TIMEZONE)
 
         if periodo == "hoje":
             data_inicio = now.replace(

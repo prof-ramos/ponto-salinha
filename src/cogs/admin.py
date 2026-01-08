@@ -3,7 +3,7 @@ import logging
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+from src.config import TIMEZONE
 
 logger = logging.getLogger("PontoBot.Admin")
 
@@ -34,7 +34,6 @@ class AdminCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db = bot.db
-        self.TZ = ZoneInfo("America/Sao_Paulo")
 
     @app_commands.command(
         name="config", description="Configurar canal de logs e cargo autorizado"
@@ -70,7 +69,7 @@ class AdminCog(commands.Cog):
             title="⚙️ Configuração Atualizada",
             description="As preferências do bot para este servidor foram salvas.",
             color=discord.Color.blue(),
-            timestamp=datetime.now(self.TZ),
+            timestamp=datetime.now(TIMEZONE),
         )
         embed.add_field(name="Canal de Logs", value=canal_log.mention, inline=True)
         embed.add_field(
@@ -122,7 +121,7 @@ class AdminCog(commands.Cog):
         data_limite = None
         if periodo != "total":
             dias = self.PERIOD_TO_DAYS.get(periodo, 0)
-            data_limite = (datetime.now(self.TZ) - timedelta(days=dias)).isoformat()
+            data_limite = (datetime.now(TIMEZONE) - timedelta(days=dias)).isoformat()
 
         try:
             count = await self.db.clear_data(interaction.guild_id, data_limite)
@@ -140,7 +139,7 @@ class AdminCog(commands.Cog):
             title="🗑️ Dados Limpos",
             description="A limpeza do banco de dados foi concluída com sucesso.",
             color=discord.Color.dark_grey(),
-            timestamp=datetime.now(self.TZ),
+            timestamp=datetime.now(TIMEZONE),
         )
         embed.add_field(name="Registros Removidos", value=str(count), inline=True)
         periodo_label = next(
@@ -154,7 +153,7 @@ class AdminCog(commands.Cog):
 
     @limpar_dados.error
     @config.error
-    async def admin_error_handler(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+    async def admin_error_handler(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
         """Tratador de erros para comandos que exigem permissão de administrador."""
         if isinstance(error, app_commands.MissingPermissions):
             embed = discord.Embed(

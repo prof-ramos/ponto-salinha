@@ -38,6 +38,7 @@ O **Ponto Salinha** permite que os usuários registrem entrada e saída diretame
 ### Opção 1: Docker (Recomendado)
 
 1. **Clone o repositório:**
+   *(Substitua "seu-usuario" pelo seu nome de usuário do GitHub)*
    ```bash
    git clone https://github.com/seu-usuario/ponto-salinha.git
    cd ponto-salinha
@@ -69,12 +70,18 @@ O **Ponto Salinha** permite que os usuários registrem entrada e saída diretame
    source venv/bin/activate  # No Windows: venv\Scripts\activate
    ```
 
-3. **Instale as dependências:**
+3. **Configure as variáveis de ambiente:**
+   ```bash
+   cp .env.example .env
+   # Edite o arquivo .env e adicione seu DISCORD_TOKEN
+   ```
+
+4. **Instale as dependências:**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Inicie o bot:**
+5. **Inicie o bot:**
    ```bash
    python src/main.py
    ```
@@ -86,7 +93,7 @@ A aplicação é configurada via arquivo `.env` na raiz do projeto.
 | Variável | Descrição | Padrão | Obrigatório |
 |:---------|:------------|:--------|:---------|
 | `DISCORD_TOKEN` | Token do seu Bot do Discord | - | Sim |
-| `DATABASE_PATH` | Caminho para o arquivo do banco SQLite | `ponto.db` | Sim |
+| `DATABASE_PATH` | Caminho para o arquivo do banco SQLite (crie a pasta se necessário) | `data/ponto.db` | Sim |
 | `LOG_LEVEL` | Nível de detalhamento dos logs (DEBUG, INFO, WARNING) | `INFO` | Não |
 
 **Exemplo de `.env`:**
@@ -127,6 +134,11 @@ Digite `/ponto` novamente para encerrar seu turno.
 3. Use um `DISCORD_TOKEN` separado para testes de desenvolvimento.
 
 ### Executando Testes
+Recomendamos o uso do **pytest** para rodar a suíte de testes (quando disponível).
+```bash
+# Exemplo de comando
+pytest
+```
 *Atualmente, o projeto não possui uma suíte de testes dedicada. Contribuições adicionando testes unitários para `database.py` e Cogs são bem-vindas.*
 
 ## Contribuição
@@ -155,6 +167,6 @@ Distribuído sob a Licença MIT. Veja `LICENSE` para mais informações.
 
 Se você encontrar algum problema ou tiver dúvidas, siga estas diretrizes:
 
-- **Bugs**: Abra uma [Issue](https://github.com/seu-usuario/ponto-salinha/issues) usando o modelo de Bug. Inclua passos para reproduzir, comportamento esperado e logs, se possível.
+- **Bugs**: Abra uma [Issue](../../issues) usando o modelo de Bug. Inclua passos para reproduzir, comportamento esperado e logs, se possível.
 - **Funcionalidades**: Para sugerir novas ideias, use o modelo de Feature Request descrevendo o caso de uso.
-- **Dúvidas**: Para perguntas gerais ou ajuda com configuração, sinta-se à vontade para perguntar em nosso servidor do Discord ou nas Discussões do GitHub.
+- **Dúvidas**: Para perguntas gerais ou ajuda com configuração, sinta-se à vontade para perguntar em nosso servidor do Discord ou nas [Discussões](../../discussions) do GitHub.

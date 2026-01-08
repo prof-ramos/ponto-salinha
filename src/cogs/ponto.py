@@ -3,7 +3,7 @@ import logging
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
-from zoneinfo import ZoneInfo
+from src.config import TIMEZONE
 
 logger = logging.getLogger("PontoBot.Ponto")
 
@@ -12,7 +12,6 @@ class PontoCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db = bot.db
-        self.TZ = ZoneInfo("America/Sao_Paulo")
 
     @app_commands.command(
         name="ponto", description="Registrar sua entrada ou saída do trabalho"
@@ -31,7 +30,7 @@ class PontoCog(commands.Cog):
         user_id = interaction.user.id
         guild_id = interaction.guild_id
         # Use Brazil time for consistency
-        now = datetime.now(self.TZ)
+        now = datetime.now(TIMEZONE)
         timestamp_atual = now.isoformat()
 
         try:
@@ -72,9 +71,13 @@ class PontoCog(commands.Cog):
                 timestamp_entrada = datetime.fromisoformat(
                     status_data["timestamp_entrada"]
                 )
-                # Ensure incoming timestamp is aware or assumes TZ
+                # Ensure incoming timestamp is aware
                 if timestamp_entrada.tzinfo is None:
-                    timestamp_entrada = timestamp_entrada.replace(tzinfo=self.TZ)
+                    # Se não tem timezone, assumimos que foi salvo como TIMEZONE local
+                    timestamp_entrada = timestamp_entrada.replace(tzinfo=TIMEZONE)
+                else:
+                    # Se tem timezone, convertemos para garantir consistência
+                    timestamp_entrada = timestamp_entrada.astimezone(TIMEZONE)
             except (ValueError, TypeError, KeyError) as e:
                 logger.error(
                     f"Erro ao processar timestamp de entrada para o usuário {user_id}: {e}"

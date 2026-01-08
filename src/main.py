@@ -6,6 +6,7 @@ import sys
 from dotenv import load_dotenv
 import logging
 from database import Database
+from config import DISCORD_TOKEN
 
 # Configuração de logging
 logging.basicConfig(
@@ -18,21 +19,20 @@ load_dotenv()
 
 
 class PontoBot(commands.Bot):
-    def __init__(self):
+    def __init__(self, db: Database) -> None:
         intents = discord.Intents.default()
         intents.members = True
         # Setting command_prefix to empty list as we primarily use Slash Commands
         super().__init__(command_prefix=[], intents=intents)
-
-        try:
-            self.db = Database()
-        except Exception as e:
-            logger.error(f"Erro ao inicializar o banco de dados: {e}")
-            raise e
+        self.db = db
 
     async def setup_hook(self):
         """Inicializa o banco de dados e carrega os Cogs."""
-        await self.db.init_db()
+        try:
+            await self.db.init_db()
+        except Exception as e:
+            logger.error(f"Erro ao inicializar o banco de dados: {e}")
+            raise e
 
         cogs_dir = os.path.join(os.path.dirname(__file__), "cogs")
         if not os.path.isdir(cogs_dir):
@@ -60,15 +60,20 @@ class PontoBot(commands.Bot):
 
 
 async def main():
-    bot = PontoBot()
+    try:
+        db = Database()
+    except Exception as e:
+        logger.critical(f"Erro fatal ao criar conexão com banco: {e}")
+        return
+
+    bot = PontoBot(db)
     async with bot:
-        token = os.getenv("DISCORD_TOKEN")
-        if not token:
-            logger.error("DISCORD_TOKEN não encontrado no arquivo .env")
+        if not DISCORD_TOKEN:
+            logger.critical("DISCORD_TOKEN não encontrado nas configurações ou arquivo .env")
             return
 
         try:
-            await bot.start(token)
+            await bot.start(DISCORD_TOKEN)
         except Exception as e:
             logger.critical(f"Falha ao iniciar conexão com Discord: {e}", exc_info=True)
             raise
