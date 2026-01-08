@@ -19,6 +19,8 @@ class Database:
     def __init__(self, db_path: str = None):
         self.db_path = db_path or os.getenv("DATABASE_PATH", "ponto.db")
         self._validate_db_path()
+        # Cache for configuration to reduce database reads
+        self._config_cache = {}
 
     def _validate_db_path(self):
         """Validates that the database path is writable."""
@@ -111,13 +113,24 @@ class Database:
         if not isinstance(guild_id, int):
             raise ValueError("guild_id must be an integer")
 
+        # Return cached config if available
+        if guild_id in self._config_cache:
+            return self._config_cache[guild_id]
+
         try:
             async with aiosqlite.connect(self.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT * FROM config WHERE guild_id = ?", (guild_id,)
                 ) as cursor:
-                    return await cursor.fetchone()
+                    row = await cursor.fetchone()
+
+                    # Manage cache size
+                    if len(self._config_cache) > 1000:
+                        self._config_cache.clear()
+
+                    self._config_cache[guild_id] = row
+                    return row
         except SQLiteError as e:
             logger.error(f"Error fetching config for guild {guild_id}", exc_info=True)
             raise DatabaseError(f"Failed to get config for guild {guild_id}") from e
@@ -148,6 +161,10 @@ class Database:
                     (guild_id, log_channel_id, cargo_autorizado_id),
                 )
                 await db.commit()
+
+            # Invalidate cache for this guild to force refresh on next get
+            if guild_id in self._config_cache:
+                del self._config_cache[guild_id]
         except SQLiteError as e:
             logger.error(f"Error setting config for guild {guild_id}", exc_info=True)
             raise DatabaseError(f"Failed to set config for guild {guild_id}") from e
