@@ -3,10 +3,83 @@ from datetime import datetime
 import os
 
 class Database:
+    _config_cache = {}
+
     def __init__(self, db_path='ponto.db'):
         self.db_path = db_path
         # init_db is now called explicitly in main.py to avoid overhead on every instantiation
     
+    def get_config(self, guild_id):
+        """Get configuration for a guild with caching."""
+        if guild_id in self._config_cache:
+            return self._config_cache[guild_id]
+
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT guild_id, log_channel_id, mensagem_entrada, mensagem_saida, cargo_autorizado_id, timezone
+            FROM config
+            WHERE guild_id = ?
+        ''', (guild_id,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            data = {
+                'guild_id': row[0],
+                'log_channel_id': row[1],
+                'mensagem_entrada': row[2],
+                'mensagem_saida': row[3],
+                'cargo_autorizado_id': row[4],
+                'timezone': row[5]
+            }
+            self._config_cache[guild_id] = data
+            return data
+        return None
+
+    def set_config(self, guild_id, **kwargs):
+        """Update configuration for a guild and invalidate cache."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Fetch current to merge
+        cursor.execute('SELECT * FROM config WHERE guild_id = ?', (guild_id,))
+        row = cursor.fetchone()
+
+        # Defaults
+        data = {
+            'log_channel_id': None,
+            'mensagem_entrada': None,
+            'mensagem_saida': None,
+            'cargo_autorizado_id': None,
+            'timezone': 'America/Sao_Paulo'
+        }
+
+        if row:
+            # Map based on index from SELECT * (order: guild_id, log, msg_in, msg_out, cargo, tz)
+            data['log_channel_id'] = row[1]
+            data['mensagem_entrada'] = row[2]
+            data['mensagem_saida'] = row[3]
+            data['cargo_autorizado_id'] = row[4]
+            data['timezone'] = row[5]
+
+        # Update with kwargs
+        for key, value in kwargs.items():
+            if key in data:
+                data[key] = value
+
+        cursor.execute('''
+            INSERT OR REPLACE INTO config (guild_id, log_channel_id, mensagem_entrada, mensagem_saida, cargo_autorizado_id, timezone)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (guild_id, data['log_channel_id'], data['mensagem_entrada'], data['mensagem_saida'], data['cargo_autorizado_id'], data['timezone']))
+
+        conn.commit()
+        conn.close()
+
+        # Invalidate cache
+        if guild_id in self._config_cache:
+            del self._config_cache[guild_id]
+
     def get_connection(self):
         conn = sqlite3.connect(self.db_path)
         # Enable WAL mode for better concurrency
