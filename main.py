@@ -15,46 +15,21 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Thread-safe timezone cache
-_timezone_cache = {}
-_timezone_cache_lock = threading.Lock()
-
 # Helpers for Timezone
 def get_guild_timezone(guild_id: int) -> pytz.BaseTzInfo:
     """Retrieve timezone string from DB or default to Sao_Paulo (with per-guild caching)"""
-    # Check cache first
-    with _timezone_cache_lock:
-        if guild_id in _timezone_cache:
-            return _timezone_cache[guild_id]
-
-    # Cache miss - fetch from database
     db = Database()
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT timezone FROM config WHERE guild_id = ?', (guild_id,))
-    res = cursor.fetchone()
-    conn.close()
+    config_data = db.get_config(guild_id)
 
-    if res and res[0]:
-        try:
-            tz = pytz.timezone(res[0])
-        except pytz.UnknownTimeZoneError:
-            # Invalid timezone in database - fallback to default
-            print(f"Warning: Invalid timezone '{res[0]}' for guild {guild_id}, using default")
-            tz = pytz.timezone('America/Sao_Paulo')
-    else:
-        tz = pytz.timezone('America/Sao_Paulo')
+    tz_str = 'America/Sao_Paulo'
+    if config_data and config_data.get('timezone'):
+        tz_str = config_data['timezone']
 
-    # Store in cache (double-checked locking to prevent race conditions)
-    with _timezone_cache_lock:
-        if guild_id not in _timezone_cache:
-            _timezone_cache[guild_id] = tz
-        return _timezone_cache[guild_id]
-
-def clear_guild_timezone_cache(guild_id: int) -> None:
-    """Clear timezone cache for a specific guild"""
-    with _timezone_cache_lock:
-        _timezone_cache.pop(guild_id, None)
+    try:
+        return pytz.timezone(tz_str)
+    except pytz.UnknownTimeZoneError:
+        print(f"Warning: Invalid timezone '{tz_str}' for guild {guild_id}, using default")
+        return pytz.timezone('America/Sao_Paulo')
 
 def get_now(guild_id: int):
     """Get current time aware of guild timezone"""
@@ -72,18 +47,14 @@ async def check_authorized_role(interaction: discord.Interaction) -> bool:
         return True
 
     db = Database()
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT cargo_autorizado_id FROM config WHERE guild_id = ?', (interaction.guild_id,))
-    res = cursor.fetchone()
-    conn.close()
+    config_data = db.get_config(interaction.guild_id)
 
     # If no role configured, only admin (already checked)
-    if not res or not res[0]:
+    if not config_data or not config_data.get('cargo_autorizado_id'):
         await interaction.response.send_message("❌ Nenhum cargo autorizado configurado e você não é administrador.", ephemeral=True)
         return False
 
-    role_id = res[0]
+    role_id = config_data['cargo_autorizado_id']
     user_roles = [r.id for r in interaction.user.roles]
 
     if role_id in user_roles:
@@ -121,36 +92,26 @@ async def config(
         return
 
     db = Database()
-    conn = db.get_connection()
-    cursor = conn.cursor()
     
-    # Get current values first to handle partial updates
-    cursor.execute('SELECT log_channel_id, cargo_autorizado_id, timezone FROM config WHERE guild_id = ?', (interaction.guild_id,))
-    current = cursor.fetchone()
+    # Check valid timezone first if provided
+    new_timezone = fuso_horario
+    if new_timezone:
+        try:
+            pytz.timezone(new_timezone)
+        except pytz.UnknownTimeZoneError:
+            await interaction.response.send_message(f"❌ Fuso horário inválido: {new_timezone}. Use formato 'Continente/Cidade' (Ex: America/Sao_Paulo)", ephemeral=True)
+            return
 
-    new_log_id = canal_log.id if canal_log else (current[0] if current else None)
-    new_role_id = cargo.id if cargo else (current[1] if current else None)
-    new_timezone = fuso_horario if fuso_horario else (current[2] if current else 'America/Sao_Paulo')
-
-    # Validate timezone
-    try:
-        pytz.timezone(new_timezone)
-    except pytz.UnknownTimeZoneError:
-        conn.close()
-        await interaction.response.send_message(f"❌ Fuso horário inválido: {new_timezone}. Use formato 'Continente/Cidade' (Ex: America/Sao_Paulo)", ephemeral=True)
-        return
-
-    cursor.execute('''
-        INSERT OR REPLACE INTO config (guild_id, log_channel_id, cargo_autorizado_id, timezone)
-        VALUES (?, ?, ?, ?)
-    ''', (interaction.guild_id, new_log_id, new_role_id, new_timezone))
-
-    conn.commit()
-    conn.close()
-
-    # Clear cache for this specific guild if timezone was updated
+    # Update config using new method
+    updates = {}
+    if canal_log:
+        updates['log_channel_id'] = canal_log.id
+    if cargo:
+        updates['cargo_autorizado_id'] = cargo.id
     if fuso_horario:
-        clear_guild_timezone_cache(interaction.guild_id)
+        updates['timezone'] = fuso_horario
+
+    db.set_config(interaction.guild_id, **updates)
 
     msg_parts = []
     if canal_log: msg_parts.append(f"Logs: {canal_log.mention}")
@@ -218,12 +179,10 @@ async def ponto(interaction: discord.Interaction):
         emoji = "🔴"
     
     conn.commit()
+    conn.close()
     
     # Buscar canal de log
-    cursor.execute('SELECT log_channel_id FROM config WHERE guild_id = ?', 
-                   (interaction.guild_id,))
-    config_data = cursor.fetchone()
-    conn.close()
+    config_data = db.get_config(interaction.guild_id)
     
     await interaction.response.send_message(
         f"{emoji} **Ponto de {tipo_msg}** registrado!",
@@ -231,8 +190,8 @@ async def ponto(interaction: discord.Interaction):
     )
     
     # Enviar para canal de log
-    if config_data and config_data[0]:
-        canal = interaction.guild.get_channel(config_data[0])
+    if config_data and config_data.get('log_channel_id'):
+        canal = interaction.guild.get_channel(config_data['log_channel_id'])
         if canal:
             await canal.send(
                 f"{emoji} {interaction.user.mention} registrou **{tipo_msg}** às {now_aware.strftime('%H:%M:%S')}"
