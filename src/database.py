@@ -1,6 +1,7 @@
 import aiosqlite
 import os
 import logging
+import time
 from typing import Optional, Any
 from aiosqlite import Error as SQLiteError
 
@@ -19,6 +20,8 @@ class Database:
     def __init__(self, db_path: str = None):
         self.db_path = db_path or os.getenv("DATABASE_PATH", "ponto.db")
         self._validate_db_path()
+        self._config_cache = {}  # Cache: guild_id -> (data, timestamp)
+        self._cache_ttl = 60  # Cache TTL in seconds
 
     def _validate_db_path(self):
         """Validates that the database path is writable."""
@@ -111,13 +114,27 @@ class Database:
         if not isinstance(guild_id, int):
             raise ValueError("guild_id must be an integer")
 
+        # Check cache
+        if guild_id in self._config_cache:
+            data, timestamp = self._config_cache[guild_id]
+            if time.time() - timestamp < self._cache_ttl:
+                return data
+
         try:
             async with aiosqlite.connect(self.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT * FROM config WHERE guild_id = ?", (guild_id,)
                 ) as cursor:
-                    return await cursor.fetchone()
+                    row = await cursor.fetchone()
+                    if row:
+                        # Convert to dict for caching and consistent usage
+                        result = {key: row[key] for key in row.keys()}
+                    else:
+                        result = None
+
+                    self._config_cache[guild_id] = (result, time.time())
+                    return result
         except SQLiteError as e:
             logger.error(f"Error fetching config for guild {guild_id}", exc_info=True)
             raise DatabaseError(f"Failed to get config for guild {guild_id}") from e
@@ -148,6 +165,9 @@ class Database:
                     (guild_id, log_channel_id, cargo_autorizado_id),
                 )
                 await db.commit()
+
+            # Invalidate cache
+            self._config_cache.pop(guild_id, None)
         except SQLiteError as e:
             logger.error(f"Error setting config for guild {guild_id}", exc_info=True)
             raise DatabaseError(f"Failed to set config for guild {guild_id}") from e
