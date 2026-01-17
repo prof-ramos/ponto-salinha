@@ -58,6 +58,11 @@ class PontoBot(commands.Bot):
         logger.info(f"Bot online como {self.user}")
         await self.change_presence(activity=discord.Game(name="/ponto"))
 
+    async def close(self):
+        """Cleanly close the database connection."""
+        await self.db.close()
+        await super().close()
+
 
 async def main():
     bot = PontoBot()
